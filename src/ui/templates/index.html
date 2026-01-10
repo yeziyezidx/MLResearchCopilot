@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Research Copilot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .info-box {
+            background: #f5f5f5;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+        
+        .info-box strong {
+            color: #333;
+        }
+        
+        .info-box p {
+            color: #666;
+            margin: 5px 0;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 ML Research Copilot</h1>
+        <p class="subtitle">智能研究问题分析与论文综述系统</p>
+        
+        <form id="queryForm">
+            <div class="form-group">
+                <label for="query">研究问题 *</label>
+                <input
+                    type="text"
+                    id="query"
+                    name="query"
+                    placeholder="例如：如何使用 Transformer 进行机器翻译？"
+                    required
+                >
+            </div>
+            
+            <div class="form-group">
+                <label for="context">背景信息（可选）</label>
+                <textarea
+                    id="context"
+                    name="context"
+                    placeholder="提供相关的背景信息，帮助系统更好地理解您的问题..."
+                ></textarea>
+            </div>
+            
+            <button type="submit" class="btn">🚀 分析问题并搜索论文</button>
+        </form>
+        
+        <div class="info-box">
+            <strong>系统工作流程：</strong>
+            <p>1. 🎯 意图理解 - 分析您的研究意图</p>
+            <p>2. 🔑 关键词抽取 - 提取关键词和专业术语</p>
+            <p>3. 🌐 论文检索 - 从多个来源搜索相关论文</p>
+            <p>4. 📊 信息抽取 - 抽取结构化信息</p>
+            <p>5. 📈 综合分析 - 进行跨论文综合分析</p>
+        </div>
+    </div>
+    
+    <script>
+        document.getElementById('queryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const query = document.getElementById('query').value;
+            const context = document.getElementById('context').value;
+            
+            try {
+                const response = await fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        query: query,
+                        context: context,
+                    }),
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // 重定向到结果页面
+                    window.location.href = `/results?query_id=${data.query_id}`;
+                } else {
+                    alert('提交失败，请重试');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('提交出错：' + error.message);
+            }
+        });
+    </script>
+</body>
+</html>
