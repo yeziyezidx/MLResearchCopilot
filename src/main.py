@@ -24,7 +24,7 @@ from src.synthesis.summarizer import Summarizer
 class ResearchEngine:
     """Research Engine for ML Research Copilot"""
     
-    def __init__(self, config=None):
+    def __init__(self, config=None, enable_debug: bool = True):
         """Initialize the research engine"""
         self.config = config or get_config()
         self.llm_client = None
@@ -50,6 +50,13 @@ class ResearchEngine:
         self.paper_extractor = PaperExtractor(self.llm_client)
         self.aggregator = Aggregator()
         self.summarizer = Summarizer(self.llm_client)
+
+        # debug logger
+        if enable_debug:
+            from tests.debugger import DebugLogger
+            self.debug_logger = DebugLogger()
+        else:
+            self.debug_logger = None
     
     def process_query(self, query: str, context: str = None) -> str:
         """
@@ -77,15 +84,19 @@ class ResearchEngine:
             print(f" -> user intent: {intent.intent_type}")
             print(f" -> research area: {intent.research_area}")
             print(f" -> research questions: {intent.research_questions}")
+            if self.debug_logger:
+                self.debug_logger.log_step("intent_understanding", intent, step_number=1)
             
             # 2. Broad answer / concept understanding
             print("\n-- step 2: Broad answer / concept understanding...")
             broad_answers = []
-            for rewrite_query in list(intent.research_questions.values()):
+            for idx, rewrite_query in enumerate(intent.research_questions):
                 print(f" -> rewriting query: {rewrite_query}")
                 answer = self.broad_answer_generator.generate(rewrite_query, query)
                 print(f" -> generated broad answer: {answer.summary[:100]}...")
                 broad_answers.append(answer)
+                if self.debug_logger:
+                    self.debug_logger.log_step(f"broad_answer_{idx}", answer, step_number=2)
             
             keywords = self.concept_understander.extract_keywords(broad_answers)
             

@@ -76,12 +76,20 @@ class ResearchIntent:
         intent_dict = {"original_query": self.original_query}
         if isinstance(self.intent_type, dict):
             intent_dict["intent_type"] = list(self.intent_type.values())
+        else:
+            intent_dict["intent_type"] = self.intent_type
         if isinstance(self.research_area, dict):
             intent_dict["research_area"] = list(self.research_area.values())
+        else:
+            intent_dict["research_area"] = self.research_area
         if isinstance(self.key_topics, dict):
             intent_dict["key_topics"] = list(self.key_topics.values())
+        else:
+            intent_dict["key_topics"] = self.key_topics
         if isinstance(self.research_questions, dict):
             intent_dict["research_questions"] = list(self.research_questions.values())
+        else:
+            intent_dict["research_questions"] = self.research_questions
         return intent_dict
 
 
@@ -121,8 +129,8 @@ class IntentUnderstanding:
 
         return ResearchIntent(
             original_query=query,
-            intent_type=intent_data.get("intent_type", "literature_review"),
-            research_area=intent_data.get("research_area", ""),
+            intent_type=intent_data.get("intent_type", ["literature_review"]),
+            research_area=intent_data.get("research_area", []),
             key_topics=intent_data.get("key_topics", []),
             research_questions=intent_data.get("research_questions", []),
             context=context,
@@ -146,6 +154,16 @@ class IntentUnderstanding:
             json_str = response[start_idx:end_idx].strip()
             
             intent_data = json.loads(json_str)
+
+            for key, value in intent_data.items():
+                if isinstance(value, dict):
+                    result = []
+                    for v in value.values():
+                        if isinstance(v, list):
+                            result.extend(v)
+                        elif isinstance(v, str):
+                            result.append(v)
+                    intent_data[key] = result
             return intent_data
         except (ValueError, json.JSONDecodeError) as e:
             print(f"Error parsing intent understanding response: {e}")
