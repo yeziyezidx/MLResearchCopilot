@@ -43,8 +43,8 @@ class ResearchEngine:
         
         # initialize modules
         self.intent_analyzer = IntentUnderstanding(self.llm_client)
-        self.broad_answer_generator = BroadAnswerGenerator(self.llm_client)
-        self.concept_understander = ConceptUnderstanding()
+        self.broad_answer_generator = BroadAnswerGenerator(self.llm_client, enable_web_search=True, num_search_results=5)
+        self.concept_understander = ConceptUnderstanding(self.llm_client)
         self.problem_formulator = ProblemFormulator(self.llm_client)
         self.retriever = Retriever()
         self.paper_extractor = PaperExtractor(self.llm_client)
@@ -87,7 +87,7 @@ class ResearchEngine:
             if self.debug_logger:
                 self.debug_logger.log_step("intent_understanding", intent, step_number=1)
             
-            # 2. Broad answer / concept understanding
+            # 2. Broad answer Generation
             print("\n-- step 2: Broad answer / concept understanding...")
             broad_answers = []
             for idx, rewrite_query in enumerate(intent.research_questions):
@@ -98,30 +98,36 @@ class ResearchEngine:
                 if self.debug_logger:
                     self.debug_logger.log_step(f"broad_answer_{idx}", answer, step_number=2)
             
-            keywords = self.concept_understander.extract_keywords(broad_answers)
+            # 3. Get scenario concepts
+            print("\n-- step 3: Get scenario concepts...")
+            concepts = self.concept_understander.understand_concepts(query, broad_answers)
+            print(f" -> related queries: {concepts.related_concepts}")
+            if self.debug_logger:
+                self.debug_logger.log_step("get_scenario_concepts", concepts , step_number=3)
             
-            # 3. problem formulation
-            print("\n-- step 3: problem formulation...")
-            problem = self.problem_formulator.formulate(
-                query, keywords.all_keywords(), intent.to_dict(), context
-            )
-            print(f" -> search queries: {problem.search_queries[:3]}")
-            
-            # 4. paper retrieval
-            print("\n-- step 4: paper retrieval...")
-            papers = self.retriever.search_by_keywords(keywords.all_keywords(), top_k=self.config.SEARCH_TOP_K)
+            # 4. problem formulation
+            print("\n-- step 4: acamedic problem formulation...")
+            problem = self.concept_understander.generate_paper_search_query(query, concepts)
+            print(f" -> academic queries: {problem.academic_queris}")
+            print(f" -> academic domains: {problem.relevant_domains}")
+            if self.debug_logger:
+                self.debug_logger.log_step("generate_academic_queries", problem , step_number=4)
+
+            # 5. paper retrieval
+            print("\n-- step 5: paper retrieval...")
+            papers = self.retriever.search_by_keywords(concepts, top_k=self.config.SEARCH_TOP_K)
             print(f" -> retrieved {len(papers)} papers")
             
-            # 5. information extraction
-            print("\n-- step 5: information extraction...")
+            # 6. information extraction
+            print("\n-- step 6: information extraction...")
             structured_papers = []
             for paper in papers:
                 structured = self.paper_extractor.extract(paper.to_dict())
                 structured_papers.append(structured)
             print(f" -> processed {len(structured_papers)} papers")
             
-            # 6. cross-paper synthesis
-            print("\n-- step 6: cross-paper synthesis...")
+            # 7. cross-paper synthesis
+            print("\n-- step 7: cross-paper synthesis...")
             synthesis = self.summarizer.synthesize(structured_papers)
             aggregation = self.aggregator.generate_summary(structured_papers)
             print(f" -> identified {aggregation['total_papers']} papers")
@@ -132,7 +138,7 @@ class ResearchEngine:
                 "query": query,
                 "context": context,
                 "intent": intent.to_dict(),
-                "keywords": keywords.to_dict(),
+                "concepts": concepts.to_dict(),
                 "problem": problem.to_dict(),
                 "papers": [p.to_dict() for p in structured_papers],
                 "synthesis": synthesis,

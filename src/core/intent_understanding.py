@@ -18,7 +18,7 @@ You MUST output using these tags for easy parsing:
     2. Identify the precise academic subfields involved (avoid vague, broad domains).
     3. Determine the research intent type using established research-methodology terminology , must include the specific query + scenario
        (e.g., "comparative evaluation of evidence extraction in AI search systems" rather than simply "method comparison of information extraction method").
-    4. Analyze and refine the original question into specific, operationalized, academically valid research questions.
+    4. Analyze and refine the original question into specific, operationalized, academically valid research questions no more than 7 tokens
        - Use terminology from information extraction, retrieval-augmented generation,
          document understanding, and web data mining.
     5. Explain how each refined question corresponds to known research tasks 
@@ -121,7 +121,7 @@ class IntentUnderstanding:
         
         # call LLM
         if self.llm_client:
-            response = self.llm_client.call(prompt, output_format="json")
+            response = self.llm_client.call(prompt, temperature=0.1, output_format="json")
             intent_data = self._parse_response(response)
         else:
             # local simple processing

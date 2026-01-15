@@ -1,13 +1,21 @@
 """
-问题构建模块 - 将用户问题转化为结构化的域问题
+problem formulation - convert user query to domain problem 
 """
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 
+from string import Template
+import json
+
+concept_understanding_template = Template(r'''
+
+You are a senior research scientist and systems architect. 
+                  
+''')
 
 @dataclass
 class DomainProblem:
-    """域问题"""
+    """domain problem"""
     problem_statement: str
     research_objectives: List[str]
     evaluation_metrics: List[str]
@@ -16,7 +24,6 @@ class DomainProblem:
     search_queries: List[str]  # 用于检索的搜索查询
     
     def to_dict(self) -> Dict:
-        """转换为字典"""
         return {
             "problem_statement": self.problem_statement,
             "research_objectives": self.research_objectives,
@@ -28,42 +35,42 @@ class DomainProblem:
 
 
 class ProblemFormulator:
-    """问题构建模块"""
+    """ProblemFormulator"""
     
     def __init__(self, llm_client=None):
         """
-        初始化问题构建器
+        inialize the problem constructor
         
         Args:
-            llm_client: LLM 客户端实例
+            llm_client: LLM client
         """
         self.llm_client = llm_client
     
     def formulate(
         self,
         query: str,
-        keywords: List[str],
+        keywords: Dict,
         intent: Dict,
         context: Optional[str] = None,
     ) -> DomainProblem:
         """
-        将用户问题转化为结构化的域问题
+        convert the user query into paper search - oriented query
         
         Args:
-            query: 原始用户问题
-            keywords: 抽取的关键词
-            intent: 研究意图
-            context: 背景信息
+            query: initial query
+            keywords: the domain concepts
+            intent: query subintens
+            context: background
             
         Returns:
-            DomainProblem: 结构化的域问题
+            DomainProblem: stuctured domain problem
         """
-        # 构建提示词
+
         prompt = self._build_prompt(query, keywords, intent, context)
         
-        # 调用 LLM 进行结构化处理
+
         if self.llm_client:
-            response = self.llm_client.call(prompt)
+            response = self.llm_client.call(prompt, max_tokens=10240,output_format="json")
             problem_data = self._parse_response(response)
         else:
             problem_data = self._local_formulation(query, keywords)

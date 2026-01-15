@@ -5,6 +5,10 @@ Research 意图理解 + 领域问题构建[by LLM]
 What: Broad Answer 关键概念理解[by LLM + 联网搜]
    ↓  
 Which: Approach抽取（例如：模型名称、论文名、关键库、方法术语） [by LLM]
+   P1. Answer-Oriented System Framing
+   P2. Workflow-level Research Question Decomposition
+   P3. Problem–Technique Alignment
+   P4. Academic Query Generation
    ↓  
 |-->语义检索（Semantic Search）[by Domain Specific Retrieval Model: github, huggingface, 论文库（arXiv、ACL Anthology]
 |   ↓  
