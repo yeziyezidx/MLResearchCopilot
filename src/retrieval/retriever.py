@@ -1,89 +1,114 @@
 """
-综合检索器 - 整合多个检索方法
+retriever - including multi retrieval approach
 """
 from typing import List, Dict, Optional
-from .semantic_search import SemanticSearcher, SearchResult
+from rank_bm25 import BM25Okapi
+from .semantic_search import SemanticSearcher
 from .paper_sources import PaperSourceManager
 
 
 class Retriever:
-    """综合检索器"""
+    """main retriever"""
     
     def __init__(self, use_semantic_search: bool = True):
         """
-        初始化检索器
+        initailize
         
         Args:
-            use_semantic_search: 是否使用语义搜索
+            use_semantic_search: if use semantic search
         """
         self.source_manager = PaperSourceManager()
         self.semantic_searcher = SemanticSearcher() if use_semantic_search else None
     
     def search(
         self,
+        original_query: str,
         queries: List[str],
         top_k: int = 10,
         sources: Optional[List[str]] = None,
-    ) -> List[SearchResult]:
+    ) -> Dict:
         """
-        搜索相关论文
+        retrieve paper by query list and rank with a two-stage BM25 approach
         
         Args:
-            queries: 搜索查询列表
-            top_k: 返回 top k 结果
-            sources: 指定搜索的论文源 (如果为 None，则搜索所有源)
+            original_query: The main query from the user.
+            queries: A list of sub-queries (can include the original query).
+            top_k: The final number of results to return.
+            sources: paper domain source (search all if None)
             
         Returns:
-            List[SearchResult]: 搜索结果列表
+            Dict: list of search result
         """
-        all_papers = {}
         
-        # 从各个论文源搜索
+        def _deduplicate(papers: List[Dict], key: str) -> List[Dict]:
+            seen = set()
+            deduped_papers = []
+            for paper in papers:
+                value = paper.get(key)
+                if value and value not in seen:
+                    seen.add(value)
+                    deduped_papers.append(paper)
+            return deduped_papers
+
         if sources is None:
             sources = ["arxiv", "semantic_scholar"]
+
+        merged_top_papers = []
+        return_result = {"sub_query": {}, "original_query": []}
         
-        for source in sources:
-            for query in queries:
-                papers = self.source_manager.search_specific(source, query, top_k=top_k)
-                for paper in papers:
-                    paper_id = paper.get("paper_id", "")
-                    if paper_id not in all_papers:
-                        all_papers[paper_id] = paper
-        
-        # 转换为 SearchResult 对象
-        results = []
-        for paper in all_papers.values():
-            result = SearchResult(
-                paper_id=paper.get("paper_id", ""),
-                title=paper.get("title", ""),
-                authors=paper.get("authors", []),
-                abstract=paper.get("abstract", ""),
-                url=paper.get("url", ""),
-                source=paper.get("source", "unknown"),
-                score=paper.get("score", 0.0),
-                published_date=paper.get("published_date"),
-            )
-            results.append(result)
-        
-        # 按相似度排序并返回 top k
-        results.sort(key=lambda x: x.score, reverse=True)
-        return results[:top_k]
-    
-    def search_by_keywords(
-        self,
-        keywords: List[str],
-        top_k: int = 10,
-    ) -> List[SearchResult]:
-        """
-        根据关键词搜索
-        
-        Args:
-            keywords: 关键词列表
-            top_k: 返回 top k 结果
+        # 1. Per-subquery processing
+        for query in queries:
+            # a. Retrieve documents
+            query_papers = []
+            for source in sources:
+                papers = self.source_manager.search_specific(source, query, top_k=10) # Fetch more to have enough after dedup
+                query_papers.extend(papers)
             
-        Returns:
-            List[SearchResult]: 搜索结果列表
-        """
-        # 组合关键词为搜索查询
-        queries = [" ".join(keywords)] + keywords
-        return self.search(queries, top_k=top_k)
+            # b. Deduplicate by url, then title
+            query_papers = _deduplicate(query_papers, "url")
+            query_papers = _deduplicate(query_papers, "title")
+            
+            if not query_papers:
+                continue
+
+            # c. Calculate BM25 scores against the subquery
+            corpus = [(p.get("title", "") + " " + p.get("abstract", "")).lower() for p in query_papers]
+            tokenized_corpus = [doc.split(" ") for doc in corpus]
+            bm25 = BM25Okapi(tokenized_corpus)
+            tokenized_query = query.lower().split(" ")
+            doc_scores = bm25.get_scores(tokenized_query)
+
+            for paper, score in zip(query_papers, doc_scores):
+                paper["score_bm25"] = score
+            
+            # d. Sort and take top 5
+            query_papers.sort(key=lambda x: x.get("score_bm25", 0.0), reverse=True)
+            merged_top_papers.extend(query_papers[:5].copy())
+
+            return_result["sub_query"][query] = query_papers
+        
+        # 2. Merge and Final Ranking
+        # a. Deduplicate merged list by url, then title
+        final_papers = _deduplicate(merged_top_papers, "url")
+        final_papers = _deduplicate(final_papers, "title")
+
+        if not final_papers:
+            return return_result
+
+        # b. Calculate final BM25 scores against the original_query
+        corpus = [(p.get("title", "") + " " + p.get("abstract", "")).lower() for p in final_papers]
+        tokenized_corpus = [doc.split(" ") for doc in corpus]
+        bm25 = BM25Okapi(tokenized_corpus)
+        tokenized_query = original_query.lower().split(" ")
+        final_scores = bm25.get_scores(tokenized_query)
+
+        # c. Create SearchResult objects
+        for paper, score in zip(final_papers, final_scores):
+            paper["score_bm25"] = score
+
+        # d. Sort and return top_k
+        final_papers.sort(key=lambda x: x.get("score_bm25", 0.0), reverse=True)
+        return_result["original_query"] = final_papers[:top_k]
+
+        return return_result
+    

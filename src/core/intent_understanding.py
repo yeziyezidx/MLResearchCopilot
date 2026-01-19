@@ -121,7 +121,7 @@ class IntentUnderstanding:
         
         # call LLM
         if self.llm_client:
-            response = self.llm_client.call(prompt, temperature=0.1, output_format="json")
+            response = self.llm_client.call(prompt, temperature=0.0, output_format="json")
             intent_data = self._parse_response(response)
         else:
             # local simple processing

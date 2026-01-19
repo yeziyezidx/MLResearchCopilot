@@ -120,7 +120,7 @@ class ConceptUnderstanding:
         knowledge = "<knowldge>"
         for answer in broadanswers:
             knowledge += "<summary>" + answer.summary + "</summary"
-            knowledge += "<key_concepts>" + "###".join([concept[:32] for concept in answer.key_concepts]) + "</key_concepts>"
+            knowledge += "<key_concepts>" + "###".join([concept[:32] for concept in answer.key_concepts]) if answer.key_concepts else "" + "</key_concepts>"
         knowledge += "</knowldge>"
 
         prompt = concept_understanding_template.substitute(query=query, knowledge=knowledge)

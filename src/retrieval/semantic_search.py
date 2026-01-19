@@ -1,5 +1,5 @@
 """
-语义检索模块 - 基于向量相似度的论文检索
+semantic search - search according to vector similarity
 """
 from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
@@ -8,18 +8,18 @@ import numpy as np
 
 @dataclass
 class SearchResult:
-    """搜索结果"""
+    """search result"""
     paper_id: str
     title: str
     authors: List[str]
     abstract: str
     url: str
     source: str  # arXiv, ACL, GitHub, etc.
-    score: float  # 相似度分数
+    score: float  # similarity score
     published_date: Optional[str] = None
     
     def to_dict(self) -> Dict:
-        """转换为字典"""
+        """convert to dict"""
         return {
             "paper_id": self.paper_id,
             "title": self.title,
@@ -33,14 +33,14 @@ class SearchResult:
 
 
 class SemanticSearcher:
-    """语义搜索模块"""
+    """semantic search module"""
     
     def __init__(self, embedding_model=None):
         """
-        初始化语义搜索器
+        initialize the semantic seacher
         
         Args:
-            embedding_model: 向量嵌入模型
+            embedding_model: mebedding module
         """
         self.embedding_model = embedding_model
         self.document_cache: Dict[str, np.ndarray] = {}
@@ -52,20 +52,20 @@ class SemanticSearcher:
         top_k: int = 10,
     ) -> List[Tuple[int, float]]:
         """
-        基于语义相似度搜索
+        search based on query vector and doc vector
         
         Args:
-            query: 查询文本
-            documents: 文档列表
-            top_k: 返回top k结果
+            query: search query
+            documents: doc candidate list
+            top_k: return top k result
             
         Returns:
-            List[Tuple]: [(文档索引, 相似度分数)]
+            List[Tuple]: [(doc index, similarity score)]
         """
-        # 获取查询的嵌入向量
+        # get the query embedding
         query_embedding = self._get_embedding(query)
         
-        # 计算与所有文档的相似度
+        # compute the doc embedding
         similarities = []
         for idx, doc in enumerate(documents):
             doc_text = doc.get("title", "") + " " + doc.get("abstract", "")
@@ -74,21 +74,21 @@ class SemanticSearcher:
             similarity = self._cosine_similarity(query_embedding, doc_embedding)
             similarities.append((idx, similarity))
         
-        # 按相似度排序并返回 top k
+        # ranking by similarity score and return top k
         similarities.sort(key=lambda x: x[1], reverse=True)
         return similarities[:top_k]
     
     def _get_embedding(self, text: str) -> np.ndarray:
-        """获取文本的嵌入向量"""
+        """get doc embedding"""
         if self.embedding_model:
             return self.embedding_model.encode(text)
         else:
-            # 简单的 TF-IDF 替代实现
+            # simple embedding by tf-idf
             return self._simple_embedding(text)
     
     def _simple_embedding(self, text: str) -> np.ndarray:
-        """简单的嵌入实现（用于演示）"""
-        # 这是一个极简化的实现
+        """simple embedding demo"""
+        # embedding demo 
         words = text.lower().split()
         vector = np.zeros(100)
         for word in words[:100]:
@@ -98,7 +98,7 @@ class SemanticSearcher:
     
     @staticmethod
     def _cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
-        """计算余弦相似度"""
+        """compute cosine similarity"""
         dot_product = np.dot(v1, v2)
         norm_v1 = np.linalg.norm(v1)
         norm_v2 = np.linalg.norm(v2)

@@ -1,33 +1,35 @@
 """
-论文来源管理模块 - 管理多个论文来源
+paper sources management - manage paper from multi-sources
 """
 from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
 import requests
 from datetime import datetime
-
+import xml.etree.ElementTree as ET
+import re
+from src.core.web_search import get_searcher, SearchResult
 
 class PaperSource(ABC):
-    """论文来源抽象基类"""
+    """paper sourcess"""
     
     @abstractmethod
     def search(self, query: str, top_k: int = 10) -> List[Dict]:
-        """搜索论文"""
+        """search paper by query"""
         pass
     
     @abstractmethod
     def fetch_paper(self, paper_id: str) -> Optional[Dict]:
-        """获取论文详情"""
+        """fetch paper details by paper id"""
         pass
 
 
 class ArxivSource(PaperSource):
-    """arXiv 论文源"""
+    """arXiv paper source"""
     
     BASE_URL = "http://export.arxiv.org/api/query"
     
     def search(self, query: str, top_k: int = 10) -> List[Dict]:
-        """从 arXiv 搜索论文"""
+        """search paper from arXiv source by query"""
         try:
             params = {
                 "search_query": query,
@@ -37,17 +39,17 @@ class ArxivSource(PaperSource):
                 "sortOrder": "descending",
             }
             
-            response = requests.get(self.BASE_URL, params=params, timeout=10)
+            response = requests.get(self.BASE_URL, params=params, timeout=60)
             response.raise_for_status()
             
             papers = self._parse_arxiv_response(response.text)
             return papers
         except Exception as e:
-            print(f"arXiv 搜索失败: {e}")
+            print(f"arXiv search failed: {e}")
             return []
     
     def fetch_paper(self, paper_id: str) -> Optional[Dict]:
-        """获取 arXiv 论文详情"""
+        """fetch paper detail from arXiv by paper id"""
         try:
             params = {"search_query": f"arxiv:{paper_id}", "max_results": 1}
             response = requests.get(self.BASE_URL, params=params, timeout=10)
@@ -56,29 +58,139 @@ class ArxivSource(PaperSource):
             papers = self._parse_arxiv_response(response.text)
             return papers[0] if papers else None
         except Exception as e:
-            print(f"获取 arXiv 论文失败: {e}")
+            print(f"fetch arXiv paper failed: {e}")
             return None
-    
+
     @staticmethod
     def _parse_arxiv_response(response_text: str) -> List[Dict]:
-        """解析 arXiv API 响应"""
-        # 简化的 XML 解析（实际应该使用 xml.etree）
+        """parse arXiv API response"""
         papers = []
-        # 这是一个占位符实现
+        try:
+            root = ET.fromstring(response_text)
+            
+            # Define namespace
+            ns = {'atom': 'http://www.w3.org/2005/Atom'}
+            
+            for entry in root.findall('atom:entry', ns):
+                paper_id = None
+                id_tag = entry.find('atom:id', ns)
+                if id_tag is not None and id_tag.text:
+                    # Extract arxiv id from the URL
+                    match = re.search(r'arxiv\.org/abs/(\d{4}\.\d{5}(v\d+)?)', id_tag.text)
+                    if match:
+                        paper_id = match.group(1)
+                
+                title = entry.find('atom:title', ns).text if entry.find('atom:title', ns) is not None else "N/A"
+                summary = entry.find('atom:summary', ns).text if entry.find('atom:summary', ns) is not None else "N/A"
+                published_date = entry.find('atom:published', ns).text if entry.find('atom:published', ns) is not None else "N/A"
+                
+                authors = [author.find('atom:name', ns).text for author in entry.findall('atom:author', ns) if author.find('atom:name', ns) is not None]
+                
+                pdf_url = None
+                # Arxiv provides multiple links, typically one with rel='alternate' for HTML and one with rel='related' and type='application/pdf' for PDF
+                for link in entry.findall('atom:link', ns):
+                    if 'title' in link.attrib and link.attrib['title'] == 'pdf':
+                        pdf_url = link.attrib['href']
+                        break
+                
+                papers.append({
+                    "paper_id": paper_id,
+                    "title": title.strip(),
+                    "authors": authors,
+                    "abstract": summary.strip(),
+                    "url": pdf_url, # Prioritize PDF link as the main URL
+                    "source": "arxiv",
+                    "published_date": published_date,
+                })
+        except ET.ParseError as e:
+            print(f"Error parsing arXiv XML response: {e}")
+        except Exception as e:
+            print(f"An unexpected error occurred during arXiv response parsing: {e}")
         return papers
 
 
+class WebSource(PaperSource):
+    """websearch paper source"""
+    def __init__(self, prefer_engine: str = "speedbird"):
+        """initialize"""
+        self.searcher = get_searcher(prefer_engine = prefer_engine)
+
+    def search(self, query: str, top_k: int = 10) -> List[Dict]:
+        """search paper from arXiv source by query"""
+        try:
+            search_results = self.searcher.search(query, top_k)
+            papers = self._parse_web_papers(search_results)
+            return papers
+        except Exception as e:
+            print(f"web search failed: {e}")
+            return []
+    
+    def fetch_paper(self, paper_id: str) -> Optional[Dict]:
+        """fetch paper detail from websearch by paper id"""
+        print("not implemented")
+        pass
+    def _parse_web_papers(self, search_result: SearchResult):
+        papers = []
+        for result in search_result:
+            try: 
+                paper_id, pdf_url = None, None
+                url = result.url
+                # Extract arxiv id from the URL
+                paper_id, pdf_url = self._parse_url_for_arxiv_id(url)
+                
+                title = result.title
+                summary = result.snippet
+                published_date = "N/A"
+                
+                authors = []
+                
+                pdf_url = ""
+
+                papers.append({
+                        "paper_id": paper_id,
+                        "title": title.strip(),
+                        "authors": authors,
+                        "abstract": summary.strip(),
+                        "url": pdf_url, # Prioritize PDF link as the main URL
+                        "source": "web",
+                        "published_date": published_date,
+                    })
+
+            except Exception as e:
+                print(f"An unexpected error occurred during web papere parsing: {e}")
+        return papers
+
+    def _parse_url_for_arxiv_id(self, url: str):
+        """
+        Parses a URL to extract an arXiv paper ID and constructs a PDF URL.
+        Returns (paper_id, pdf_url) or (None, None) if not an arXiv URL.
+        """
+        # Regex to match arXiv URLs (abs or pdf versions)
+        # It handles both 'v' versions (e.g., 1234.56789v1) and non-'v' versions
+        arxiv_id_match = re.search(r'(?:arxiv\.org/(?:abs|pdf)/)(\d{4}\.\d{5}(?:v\d+)?)', url)
+        if arxiv_id_match:
+            paper_id = arxiv_id_match.group(1)
+            pdf_url = f"https://arxiv.org/pdf/{paper_id}.pdf"
+            return paper_id, pdf_url
+        return None, None
+
+    def _is_pdf_url(self,url: str) -> bool:
+        """
+        Checks if a URL points directly to a PDF file.
+        """
+        return url.strip().lower().endswith('.pdf')
+    
 class SemanticScholarSource(PaperSource):
-    """Semantic Scholar 论文源"""
+    """Semantic Scholar paper source"""
     
     BASE_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
     
     def __init__(self, api_key: Optional[str] = None):
-        """初始化"""
+        """initialize"""
         self.api_key = api_key
     
     def search(self, query: str, top_k: int = 10) -> List[Dict]:
-        """从 Semantic Scholar 搜索论文"""
+        """search paper form Semantic Scholar"""
         try:
             params = {
                 "query": query,
@@ -97,11 +209,11 @@ class SemanticScholarSource(PaperSource):
             papers = self._parse_response(data)
             return papers
         except Exception as e:
-            print(f"Semantic Scholar 搜索失败: {e}")
+            print(f"Semantic Scholar search failed: {e}")
             return []
     
     def fetch_paper(self, paper_id: str) -> Optional[Dict]:
-        """获取论文详情"""
+        """fetch paper details"""
         url = f"https://api.semanticscholar.org/graph/v1/paper/{paper_id}"
         try:
             params = {"fields": "paperId,title,authors,abstract,url,year"}
@@ -111,12 +223,12 @@ class SemanticScholarSource(PaperSource):
             data = response.json()
             return self._format_paper(data)
         except Exception as e:
-            print(f"获取论文失败: {e}")
+            print(f"fetch paper failed: {e}")
             return None
     
     @staticmethod
     def _parse_response(data: Dict) -> List[Dict]:
-        """解析响应"""
+        """parse response"""
         papers = []
         for item in data.get("data", []):
             paper = SemanticScholarSource._format_paper(item)
@@ -126,7 +238,7 @@ class SemanticScholarSource(PaperSource):
     
     @staticmethod
     def _format_paper(item: Dict) -> Optional[Dict]:
-        """格式化论文信息"""
+        """format paper info"""
         if not item:
             return None
         
@@ -142,14 +254,14 @@ class SemanticScholarSource(PaperSource):
 
 
 class HuggingFaceSource(PaperSource):
-    """Hugging Face Models 论文源"""
+    """Hugging Face Models paper sources"""
     
     BASE_URL = "https://huggingface.co/api"
     
     def search(self, query: str, top_k: int = 10) -> List[Dict]:
-        """搜索 Hugging Face 模型"""
+        """search model of Hugging Face"""
         try:
-            # 搜索模型而不是论文
+            # search models instead of paper
             url = f"{self.BASE_URL}/models"
             params = {"search": query, "sort": "downloads", "limit": top_k}
             
@@ -160,11 +272,11 @@ class HuggingFaceSource(PaperSource):
             papers = self._format_models(models)
             return papers
         except Exception as e:
-            print(f"Hugging Face 搜索失败: {e}")
+            print(f"Hugging Face search failed: {e}")
             return []
     
     def fetch_paper(self, paper_id: str) -> Optional[Dict]:
-        """获取模型详情"""
+        """fetch paper details"""
         try:
             url = f"{self.BASE_URL}/models/{paper_id}"
             response = requests.get(url, timeout=10)
@@ -173,12 +285,12 @@ class HuggingFaceSource(PaperSource):
             model = response.json()
             return self._format_model(model)
         except Exception as e:
-            print(f"获取模型信息失败: {e}")
+            print(f"fetch model failed: {e}")
             return None
     
     @staticmethod
     def _format_models(models: List[Dict]) -> List[Dict]:
-        """格式化模型列表"""
+        """format model list"""
         papers = []
         for model in models:
             paper = HuggingFaceSource._format_model(model)
@@ -188,7 +300,7 @@ class HuggingFaceSource(PaperSource):
     
     @staticmethod
     def _format_model(model: Dict) -> Optional[Dict]:
-        """格式化单个模型"""
+        """format single model"""
         if not model:
             return None
         
@@ -204,38 +316,39 @@ class HuggingFaceSource(PaperSource):
 
 
 class PaperSourceManager:
-    """论文源管理器"""
+    """paper source manager"""
     
     def __init__(self):
-        """初始化"""
+        """initialize"""
         self.sources: Dict[str, PaperSource] = {
             "arxiv": ArxivSource(),
             "semantic_scholar": SemanticScholarSource(),
             "huggingface": HuggingFaceSource(),
+            "web": WebSource(),
         }
     
     def register_source(self, name: str, source: PaperSource):
-        """注册新的论文源"""
+        """register new source"""
         self.sources[name] = source
     
     def search_all(self, query: str, top_k: int = 10) -> Dict[str, List[Dict]]:
-        """在所有论文源中搜索"""
+        """search in all sources"""
         results = {}
         for source_name, source in self.sources.items():
             try:
                 papers = source.search(query, top_k=top_k)
                 results[source_name] = papers
             except Exception as e:
-                print(f"{source_name} 搜索失败: {e}")
+                print(f"{source_name} search failed: {e}")
                 results[source_name] = []
         
         return results
     
     def search_specific(self, source_name: str, query: str, top_k: int = 10) -> List[Dict]:
-        """在特定论文源中搜索"""
+        """search in specific source"""
         source = self.sources.get(source_name)
         if not source:
-            print(f"未找到论文源: {source_name}")
+            print(f"source not found: {source_name}")
             return []
         
         return source.search(query, top_k=top_k)

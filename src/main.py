@@ -43,10 +43,10 @@ class ResearchEngine:
         
         # initialize modules
         self.intent_analyzer = IntentUnderstanding(self.llm_client)
-        self.broad_answer_generator = BroadAnswerGenerator(self.llm_client, enable_web_search=True, num_search_results=5)
+        self.broad_answer_generator = BroadAnswerGenerator(self.llm_client, enable_web_search=True, num_search_results=3)
         self.concept_understander = ConceptUnderstanding(self.llm_client)
         self.problem_formulator = ProblemFormulator(self.llm_client)
-        self.retriever = Retriever()
+        self.retriever = Retriever(use_semantic_search=False)
         self.paper_extractor = PaperExtractor(self.llm_client)
         self.aggregator = Aggregator()
         self.summarizer = Summarizer(self.llm_client)
@@ -115,14 +115,19 @@ class ResearchEngine:
 
             # 5. paper retrieval
             print("\n-- step 5: paper retrieval...")
-            papers = self.retriever.search_by_keywords(concepts, top_k=self.config.SEARCH_TOP_K)
+            papers = self.retriever.search(query, problem.academic_queris, top_k=self.config.SEARCH_TOP_K, sources=["arxiv","web"])
+            sub_query_results = papers.get("sub_query", {})
+            papers = papers.get("original_query", [])
             print(f" -> retrieved {len(papers)} papers")
+            if self.debug_logger:
+                self.debug_logger.log_step("retrieve_academic_papers", {query: papers} , step_number=5)
+                self.debug_logger.log_step("retrieve_academic_papers_subquery", sub_query_results , step_number=5)
             
             # 6. information extraction
             print("\n-- step 6: information extraction...")
             structured_papers = []
             for paper in papers:
-                structured = self.paper_extractor.extract(paper.to_dict())
+                structured = self.paper_extractor.extract(paper)
                 structured_papers.append(structured)
             print(f" -> processed {len(structured_papers)} papers")
             
