@@ -1,5 +1,5 @@
 """
-论文元数据定义
+Paper metadata definitions
 """
 from typing import List, Dict, Optional
 from dataclasses import dataclass, asdict
@@ -7,7 +7,7 @@ from dataclasses import dataclass, asdict
 
 @dataclass
 class Author:
-    """作者信息"""
+    """Author information"""
     name: str
     affiliation: Optional[str] = None
     email: Optional[str] = None
@@ -15,7 +15,7 @@ class Author:
 
 @dataclass
 class Method:
-    """方法信息"""
+    """Method information"""
     name: str
     description: str
     parameters: Dict[str, str] = None
@@ -23,22 +23,22 @@ class Method:
 
 @dataclass
 class Result:
-    """结果信息"""
-    metric: str  # 评估指标
+    """Result information"""
+    metric: str  # Evaluation metric
     value: float
     dataset: Optional[str] = None
 
 
 @dataclass
 class Citation:
-    """引用信息"""
+    """Citation information"""
     cited_paper_id: str
     cited_title: str
-    context: str  # 引用的上下文
+    context: str  # Context of the citation
 
 
 class PaperMetadata:
-    """论文元数据"""
+    """Paper metadata"""
     
     REQUIRED_FIELDS = [
         "paper_id",
@@ -69,12 +69,12 @@ class PaperMetadata:
     
     @staticmethod
     def get_all_fields() -> List[str]:
-        """获取所有字段"""
+        """Gets all fields"""
         return PaperMetadata.REQUIRED_FIELDS + PaperMetadata.OPTIONAL_FIELDS + PaperMetadata.EXTRACTION_FIELDS
     
     @staticmethod
     def validate(data: Dict) -> bool:
-        """验证必需字段"""
+        """Validates required fields"""
         for field in PaperMetadata.REQUIRED_FIELDS:
             if field not in data or not data[field]:
                 return False

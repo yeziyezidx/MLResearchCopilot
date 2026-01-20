@@ -61,7 +61,7 @@ class Retriever:
             # a. Retrieve documents
             query_papers = []
             for source in sources:
-                papers = self.source_manager.search_specific(source, query, top_k=10) # Fetch more to have enough after dedup
+                papers = self.source_manager.search_specific(source, query, top_k=top_k) # Fetch more to have enough after dedup
                 query_papers.extend(papers)
             
             # b. Deduplicate by url, then title
@@ -83,7 +83,7 @@ class Retriever:
             
             # d. Sort and take top 5
             query_papers.sort(key=lambda x: x.get("score_bm25", 0.0), reverse=True)
-            merged_top_papers.extend(query_papers[:5].copy())
+            merged_top_papers.extend(query_papers.copy())
 
             return_result["sub_query"][query] = query_papers
         
@@ -108,7 +108,6 @@ class Retriever:
 
         # d. Sort and return top_k
         final_papers.sort(key=lambda x: x.get("score_bm25", 0.0), reverse=True)
-        return_result["original_query"] = final_papers[:top_k]
+        return_result["original_query"] = final_papers
 
         return return_result
-    

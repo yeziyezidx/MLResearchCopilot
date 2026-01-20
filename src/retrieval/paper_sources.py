@@ -1,7 +1,7 @@
 """
 paper sources management - manage paper from multi-sources
 """
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from abc import ABC, abstractmethod
 import requests
 from datetime import datetime
@@ -73,8 +73,10 @@ class ArxivSource(PaperSource):
             
             for entry in root.findall('atom:entry', ns):
                 paper_id = None
+                url = ""
                 id_tag = entry.find('atom:id', ns)
                 if id_tag is not None and id_tag.text:
+                    url = id_tag.text
                     # Extract arxiv id from the URL
                     match = re.search(r'arxiv\.org/abs/(\d{4}\.\d{5}(v\d+)?)', id_tag.text)
                     if match:
@@ -98,7 +100,8 @@ class ArxivSource(PaperSource):
                     "title": title.strip(),
                     "authors": authors,
                     "abstract": summary.strip(),
-                    "url": pdf_url, # Prioritize PDF link as the main URL
+                    "url": url, 
+                    "pdf_url": pdf_url, # Prioritize PDF link as the main URL
                     "source": "arxiv",
                     "published_date": published_date,
                 })
@@ -138,23 +141,37 @@ class WebSource(PaperSource):
                 # Extract arxiv id from the URL
                 paper_id, pdf_url = self._parse_url_for_arxiv_id(url)
                 
+                # If not an arXiv paper, try to extract from HTML content
+                if not pdf_url:
+                    if url.endswith("pdf"):
+                        pdf_url = url
+                if not pdf_url:
+                    try:
+                        response = requests.get(url, timeout=10)
+                        response.raise_for_status()
+                        html_content = response.text
+                        pdf_url = self._extract_pdf_info_from_html(html_content, url)
+                    except requests.exceptions.RequestException as req_e:
+                        print(f"Failed to fetch content from {url}: {req_e}")
+                    except Exception as html_e:
+                        print(f"Error parsing HTML from {url}: {html_e}")
+
                 title = result.title
                 summary = result.snippet
                 published_date = "N/A"
                 
                 authors = []
-                
-                pdf_url = ""
-
-                papers.append({
-                        "paper_id": paper_id,
-                        "title": title.strip(),
-                        "authors": authors,
-                        "abstract": summary.strip(),
-                        "url": pdf_url, # Prioritize PDF link as the main URL
-                        "source": "web",
-                        "published_date": published_date,
-                    })
+                if pdf_url: 
+                    papers.append({
+                            "paper_id": paper_id,
+                            "title": title.strip(),
+                            "authors": authors,
+                            "abstract": summary.strip(),
+                            "url": url, 
+                            "pdf_url": pdf_url, # Prioritize PDF link as the main URL
+                            "source": "web",
+                            "published_date": published_date,
+                        })
 
             except Exception as e:
                 print(f"An unexpected error occurred during web papere parsing: {e}")
@@ -165,9 +182,9 @@ class WebSource(PaperSource):
         Parses a URL to extract an arXiv paper ID and constructs a PDF URL.
         Returns (paper_id, pdf_url) or (None, None) if not an arXiv URL.
         """
-        # Regex to match arXiv URLs (abs or pdf versions)
+        # Regex to match arXiv URLs (abs, pdf, or html versions)
         # It handles both 'v' versions (e.g., 1234.56789v1) and non-'v' versions
-        arxiv_id_match = re.search(r'(?:arxiv\.org/(?:abs|pdf)/)(\d{4}\.\d{5}(?:v\d+)?)', url)
+        arxiv_id_match = re.search(r'(?:arxiv.org/(?:abs|pdf|html)/)(\d{4}.\d{5}(?:v\d+)?)', url)
         if arxiv_id_match:
             paper_id = arxiv_id_match.group(1)
             pdf_url = f"https://arxiv.org/pdf/{paper_id}.pdf"
@@ -179,6 +196,30 @@ class WebSource(PaperSource):
         Checks if a URL points directly to a PDF file.
         """
         return url.strip().lower().endswith('.pdf')
+    
+    @staticmethod
+    def _extract_pdf_info_from_html(html_content: str, original_url: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Extracts PDF URL and paper ID from HTML content for specific sources.
+        Currently handles aclanthology.org.
+        """
+        pdf_url = None
+        # Try to find PDF link
+        # Common pattern for aclanthology.org: <a class="btn btn-primary btn-md" href="/pdf/...">PDF</a>
+        pdf_match = re.search(r'href="(.*?\.pdf)"', html_content)
+        if pdf_match:
+            pdf_path = pdf_match.group(1)
+            # aclanthology uses relative paths or full paths. Normalize to full URL.
+            if pdf_path.startswith('/'):
+                base_url = re.match(r'(https?://[^/]+)', original_url)
+                if base_url:
+                    pdf_url = base_url.group(1) + pdf_path
+            else:
+                # Assume it's a full URL or relative to the current path if no leading '/'
+                pdf_url = pdf_path # Or potentially original_url + '/' + pdf_path if it's relative to the current path without leading slash
+
+
+        return pdf_url
     
 class SemanticScholarSource(PaperSource):
     """Semantic Scholar paper source"""

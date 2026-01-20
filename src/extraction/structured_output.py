@@ -1,5 +1,5 @@
 """
-结构化论文输出
+Structured paper output
 """
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict, field
@@ -8,9 +8,9 @@ from .metadata import Method, Result, Citation
 
 @dataclass
 class StructuredPaper:
-    """结构化论文"""
+    """Structured paper"""
     
-    # 基本信息
+    # Basic information
     paper_id: str
     title: str
     authors: List[str]
@@ -19,47 +19,47 @@ class StructuredPaper:
     source: str
     published_date: Optional[str] = None
     
-    # 论文内容的结构化抽取
+    # Structured extraction of paper content
     research_problem: Optional[str] = None
     research_objectives: List[str] = field(default_factory=list)
     
-    # 方法
+    # Methods
     methods: List[Method] = field(default_factory=list)
     
-    # 数据集
+    # Datasets
     datasets: List[str] = field(default_factory=list)
     
-    # 实验结果
+    # Experimental results
     results: List[Result] = field(default_factory=list)
     
-    # 贡献和创新点
+    # Contributions and innovations
     contributions: List[str] = field(default_factory=list)
     
-    # 局限性
+    # Limitations
     limitations: List[str] = field(default_factory=list)
     
-    # 相关工作
+    # Related work
     related_work: List[Citation] = field(default_factory=list)
     
-    # 未来工作
+    # Future work
     future_work: List[str] = field(default_factory=list)
     
-    # 标签和关键词
+    # Tags and keywords
     tags: List[str] = field(default_factory=list)
     keywords: List[str] = field(default_factory=list)
     
-    # 元数据
+    # Metadata
     citations_count: int = 0
     venue: Optional[str] = None
     doi: Optional[str] = None
     
     def to_dict(self) -> Dict:
-        """转换为字典"""
+        """Converts to dictionary"""
         data = asdict(self)
         return data
     
     def to_table_row(self) -> Dict:
-        """转换为表格行（用于展示）"""
+        """Converts to a table row (for display)"""
         return {
             "ID": self.paper_id,
             "Title": self.title,
@@ -74,7 +74,7 @@ class StructuredPaper:
         }
     
     def _format_results(self) -> str:
-        """格式化结果"""
+        """Formats results"""
         if not self.results:
             return "N/A"
         

@@ -1,5 +1,5 @@
 """
-PDF 下载器 - 支持并发下载、重试、超时控制和进度跟踪
+PDF downloader - support download by parallel, retry and timeout
 """
 import os
 import requests
@@ -10,14 +10,14 @@ import time
 
 
 class PDFDownloadError(Exception):
-    """PDF 下载错误"""
+    """PDF download error"""
     pass
 
 
 class PDFDownloader:
-    """PDF 下载器"""
+    """PDF downloader"""
     
-    # 通用的 HTTP 请求头
+    # HTTP header
     DEFAULT_HEADERS = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                      '(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -34,14 +34,14 @@ class PDFDownloader:
         chunk_size: int = 8192,
     ):
         """
-        初始化 PDF 下载器
+        initailize PDF downloader
         
         Args:
-            download_dir: 下载目录
-            max_workers: 最大并发下载数
-            timeout: 超时时间（秒）
-            max_retries: 最大重试次数
-            chunk_size: 每次读取的字节数
+            download_dir: downloader dir
+            max_workers: max workers
+            timeout: timeout by seconds
+            max_retries: max retries
+            chunk_size: chunk size by bytes
         """
         self.download_dir = Path(download_dir)
         self.download_dir.mkdir(parents=True, exist_ok=True)
@@ -65,15 +65,15 @@ class PDFDownloader:
         progress_callback: Optional[Callable] = None,
     ) -> Dict:
         """
-        下载单篇论文 PDF
+        download PDF
         
         Args:
-            url: 论文 URL
-            output_path: 输出路径（默认从 URL 生成）
-            progress_callback: 进度回调函数
+            url: paper URL
+            output_path: output dir (by url)
+            progress_callback: progress callback
             
         Returns:
-            Dict: 下载结果
+            Dict: download result
                 {
                     "success": bool,
                     "url": str,
@@ -93,7 +93,7 @@ class PDFDownloader:
             "error": None,
         }
         
-        # 如果文件已存在，跳过下载
+        # if file exists, skip
         if os.path.exists(output_path):
             result["success"] = True
             result["file_path"] = output_path
@@ -112,8 +112,8 @@ class PDFDownloader:
             except PDFDownloadError as e:
                 result["error"] = str(e)
                 if attempt < self.max_retries - 1:
-                    wait_time = 2 ** attempt  # 指数退避
-                    print(f"下载失败，{wait_time} 秒后重试: {str(e)}")
+                    wait_time = 2 ** attempt  
+                    print(f"download failed, {wait_time} seconds later retry: {str(e)}")
                     time.sleep(wait_time)
         
         self.download_stats["failed"] += 1
@@ -126,7 +126,7 @@ class PDFDownloader:
         output_path: str,
         progress_callback: Optional[Callable] = None,
     ) -> Dict:
-        """执行单次下载尝试"""
+        """download with retry"""
         try:
             response = requests.get(
                 url,
@@ -136,15 +136,15 @@ class PDFDownloader:
             )
             response.raise_for_status()
             
-            # 检查是否真的是 PDF
+            # check if it's valid PDF
             content_type = response.headers.get('content-type', '').lower()
             if 'pdf' not in content_type and response.content[:4] != b'%PDF':
-                raise PDFDownloadError(f"无效的 PDF 内容类型: {content_type}")
+                raise PDFDownloadError(f"invalid PDF content type: {content_type}")
             
-            # 获取文件大小
+            # get total file size
             total_size = int(response.headers.get('content-length', 0))
             
-            # 下载文件
+            # download file
             downloaded_size = 0
             with open(output_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=self.chunk_size):
@@ -152,7 +152,7 @@ class PDFDownloader:
                         f.write(chunk)
                         downloaded_size += len(chunk)
                         
-                        # 调用进度回调
+                        # call progress callback
                         if progress_callback and total_size > 0:
                             progress_callback(downloaded_size, total_size)
             
@@ -165,9 +165,9 @@ class PDFDownloader:
             }
             
         except requests.RequestException as e:
-            raise PDFDownloadError(f"请求失败: {str(e)}")
+            raise PDFDownloadError(f"request failed: {str(e)}")
         except IOError as e:
-            raise PDFDownloadError(f"文件写入失败: {str(e)}")
+            raise PDFDownloadError(f"file writer failed: {str(e)}")
     
     def download_papers_batch(
         self,
@@ -175,18 +175,18 @@ class PDFDownloader:
         progress_callback: Optional[Callable] = None,
     ) -> Dict:
         """
-        批量下载论文 PDF
+        download PDF by batch
         
         Args:
-            papers: 论文列表
+            papers: paper list
                 [
                     {"paper_id": "...", "url": "..."},
                     ...
                 ]
-            progress_callback: 进度回调函数
+            progress_callback: progress callback
             
         Returns:
-            Dict: 下载结果统计
+            Dict: download result stats
         """
         results = {}
         self.download_stats["total"] = len(papers)
@@ -201,11 +201,11 @@ class PDFDownloader:
                 if not url:
                     results[paper_id] = {
                         "success": False,
-                        "error": "URL 缺失",
+                        "error": "URL missing",
                     }
                     continue
                 
-                output_path = self._generate_output_path(url, paper_id)
+                output_path = self._generate_output_path(url)
                 
                 future = executor.submit(
                     self.download_paper,
@@ -215,7 +215,7 @@ class PDFDownloader:
                 )
                 futures[future] = paper_id
             
-            # 收集结果
+            # collect result
             for future in as_completed(futures):
                 paper_id = futures[future]
                 try:
@@ -235,21 +235,17 @@ class PDFDownloader:
             "results": results,
         }
     
-    def _generate_output_path(self, url: str, paper_id: Optional[str] = None) -> str:
-        """生成输出路径"""
+    def _generate_output_path(self, url: str) -> str:
+        """generate output path"""
         import hashlib
-        
-        if paper_id:
-            filename = f"{paper_id}.pdf"
-        else:
-            # 从 URL 生成哈希作为文件名
-            url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
-            filename = f"paper_{url_hash}.pdf"
+        # generate hashlib as file name from URL name
+        url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
+        filename = f"paper_{url_hash}.pdf"
         
         return str(self.download_dir / filename)
     
     def get_download_stats(self) -> Dict:
-        """获取下载统计信息"""
+        """get download stats"""
         return {
             **self.download_stats,
             "success_rate": (

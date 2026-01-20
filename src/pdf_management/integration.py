@@ -1,5 +1,5 @@
 """
-PDF 集成适配器 - 将 PDF 处理集成到主流程
+PDF Integration Adapter - Integrates PDF processing into the main workflow
 """
 from typing import List, Dict, Optional
 from src.core.types import StructuredPaper
@@ -7,15 +7,15 @@ from src.pdf_management import PDFProcessor, ExtractedInfo
 
 
 class PDFIntegrationAdapter:
-    """PDF 集成适配器 - 连接 PDF 处理与主流程"""
+    """PDF Integration Adapter - Connects PDF processing with the main workflow"""
     
     def __init__(self, llm_client=None, cache_dir: str = "./cache/pdfs"):
         """
-        初始化集成适配器
+        Initializes the integration adapter
         
         Args:
-            llm_client: LLM 客户端
-            cache_dir: PDF 缓存目录
+            llm_client: LLM client
+            cache_dir: PDF cache directory
         """
         self.processor = PDFProcessor(
             cache_dir=cache_dir,
@@ -29,26 +29,26 @@ class PDFIntegrationAdapter:
         extract_pdf: bool = True,
     ) -> Dict:
         """
-        用 PDF 内容丰富论文信息
+        Enriches paper information with PDF content
         
         Args:
-            paper: 论文字典
-            extract_pdf: 是否提取 PDF 内容
+            paper: Paper dictionary
+            extract_pdf: Whether to extract PDF content
             
         Returns:
-            Dict: 丰富后的论文信息
+            Dict: Enriched paper information
         """
         if not extract_pdf or not paper.get("url"):
             return paper
         
         try:
-            # 处理 PDF
+            # Process PDF
             result = self.processor.process_paper(paper)
             
             if result["success"]:
                 extracted = result.get("extracted_info")
                 
-                # 用 PDF 内容更新论文信息
+                # Update paper information with PDF content
                 paper["pdf_content"] = {
                     "full_text": self._extract_text_from_pdf(result["pdf_path"]),
                     "sections": {
@@ -75,14 +75,14 @@ class PDFIntegrationAdapter:
         extract_pdf: bool = True,
     ) -> List[Dict]:
         """
-        批量丰富论文信息
+        Enriches paper information in batch
         
         Args:
-            papers: 论文列表
-            extract_pdf: 是否提取 PDF 内容
+            papers: List of papers
+            extract_pdf: Whether to extract PDF content
             
         Returns:
-            List[Dict]: 丰富后的论文列表
+            List[Dict]: List of enriched papers
         """
         enriched = []
         
@@ -94,7 +94,7 @@ class PDFIntegrationAdapter:
     
     @staticmethod
     def _extract_text_from_pdf(pdf_path: str) -> str:
-        """从 PDF 提取全部文本"""
+        """Extracts all text from PDF"""
         try:
             import PyPDF2
             
@@ -108,7 +108,7 @@ class PDFIntegrationAdapter:
             return "\n".join(text)
         
         except Exception as e:
-            return f"[PDF 文本提取失败: {e}]"
+            return f"[PDF text extraction failed: {e}]"
     
     def generate_synthesis_from_pdf(
         self,
@@ -116,54 +116,54 @@ class PDFIntegrationAdapter:
         synthesis_prompt: Optional[str] = None,
     ) -> str:
         """
-        从 PDF 内容生成综合总结
+        Generates a comprehensive summary from PDF content
         
         Args:
-            paper: 论文字典（已包含 pdf_content）
-            synthesis_prompt: 综合提示词
+            paper: Paper dictionary (must include pdf_content)
+            synthesis_prompt: Synthesis prompt
             
         Returns:
-            str: LLM 生成的总结
+            str: LLM generated summary
         """
         if not self.llm_client:
-            return "LLM 客户端未配置"
+            return "LLM client not configured"
         
         if not paper.get("pdf_content"):
-            return "论文 PDF 内容未可用"
+            return "Paper PDF content not available"
         
         pdf_content = paper["pdf_content"]
         
-        # 准备内容
+        # Prepare content
         content_text = f"""
-论文标题: {paper.get('title', 'N/A')}
+Paper Title: {paper.get('title', 'N/A')}
 
-摘要:
+Abstract:
 {pdf_content.get('sections', {}).get('abstract', '')[:500]}
 
-研究方法:
+Methodology:
 {pdf_content.get('sections', {}).get('methodology', '')[:500]}
 
-主要结果:
+Main Results:
 {pdf_content.get('sections', {}).get('results', '')[:500]}
 
-结论:
+Conclusion:
 {pdf_content.get('sections', {}).get('conclusion', '')[:500]}
 """
         
-        # 生成提示词
+        # Generate prompt
         if not synthesis_prompt:
-            synthesis_prompt = """基于以下论文内容，请生成详细的研究总结，包括：
-1. 研究的核心问题和创新点
-2. 采用的主要方法和技术
-3. 关键的研究成果和发现
-4. 可能的应用和影响
-5. 与相关工作的区别
+            synthesis_prompt = """Based on the following paper content, please generate a detailed research summary, including:
+1. Core problem and innovation points of the research
+2. Main methods and techniques used
+3. Key research results and findings
+4. Potential applications and impacts
+5. Differences from related work
 
-请用中文回答，总结长度 200-300 字。"""
+Please answer in English, summary length 200-300 words."""
         
         prompt = f"""{synthesis_prompt}
 
-论文内容:
+Paper Content:
 {content_text}
 """
         
@@ -171,8 +171,8 @@ class PDFIntegrationAdapter:
             response = self.llm_client.call(prompt)
             return response
         except Exception as e:
-            return f"生成失败: {e}"
+            return f"Generation failed: {e}"
     
     def get_cache_stats(self) -> Dict:
-        """获取缓存统计"""
+        """Gets cache statistics"""
         return self.processor.get_cache_stats()

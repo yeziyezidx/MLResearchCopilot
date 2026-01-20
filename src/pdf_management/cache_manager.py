@@ -1,5 +1,5 @@
 """
-PDF 缓存管理器 - 管理本地 PDF 存储、版本控制和清理策略
+PDF Cache Manager - Manages local PDF storage, version control, and cleanup policies.
 """
 import os
 import json
@@ -10,14 +10,14 @@ from pathlib import Path
 
 
 class CacheMetadata:
-    """缓存元数据"""
+    """Cache metadata"""
     
     def __init__(self, paper_id: str, url: str, file_path: str):
         self.paper_id = paper_id
         self.url = url
         self.file_path = file_path
         self.downloaded_date = datetime.now().isoformat()
-        self.file_size = 0  # 字节
+        self.file_size = 0  # bytes
         self.file_hash = ""
         self.version = 1
         self.status = "cached"  # cached, processing, extracted
@@ -25,7 +25,7 @@ class CacheMetadata:
         self.metadata = {}
     
     def to_dict(self) -> Dict:
-        """转换为字典"""
+        """Converts to dictionary"""
         return {
             "paper_id": self.paper_id,
             "url": self.url,
@@ -41,7 +41,7 @@ class CacheMetadata:
     
     @classmethod
     def from_dict(cls, data: Dict) -> "CacheMetadata":
-        """从字典创建"""
+        """Creates from dictionary"""
         obj = cls(
             paper_id=data.get("paper_id", ""),
             url=data.get("url", ""),
@@ -57,14 +57,14 @@ class CacheMetadata:
 
 
 class CacheManager:
-    """PDF 缓存管理器"""
+    """PDF Cache Manager"""
     
     def __init__(self, cache_dir: str = "./cache/pdfs"):
         """
-        初始化缓存管理器
+        Initializes the cache manager
         
         Args:
-            cache_dir: 缓存目录
+            cache_dir: Cache directory
         """
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -72,11 +72,11 @@ class CacheManager:
         self.metadata_file = self.cache_dir / "metadata.json"
         self.metadata_cache: Dict[str, CacheMetadata] = {}
         
-        # 加载现有元数据
+        # Load existing metadata
         self._load_metadata()
     
     def _load_metadata(self):
-        """从磁盘加载元数据"""
+        """Loads metadata from disk"""
         if self.metadata_file.exists():
             try:
                 with open(self.metadata_file, 'r', encoding='utf-8') as f:
@@ -84,10 +84,10 @@ class CacheManager:
                     for paper_id, meta_data in data.items():
                         self.metadata_cache[paper_id] = CacheMetadata.from_dict(meta_data)
             except Exception as e:
-                print(f"加载元数据失败: {e}")
+                print(f"Failed to load metadata: {e}")
     
     def _save_metadata(self):
-        """保存元数据到磁盘"""
+        """Saves metadata to disk"""
         try:
             data = {
                 paper_id: meta.to_dict()
@@ -96,14 +96,13 @@ class CacheManager:
             with open(self.metadata_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
         except Exception as e:
-            print(f"保存元数据失败: {e}")
-    
+            print(f"Failed to save metadata: {e}")    
     def get_cache_path(self, paper_id: str) -> Path:
-        """获取论文的缓存路径"""
+        """Gets the cached path for a paper"""
         return self.cache_dir / f"{paper_id}.pdf"
     
     def has_cached_pdf(self, paper_id: str) -> bool:
-        """检查是否已缓存该论文"""
+        """Checks if the PDF is cached"""
         if paper_id in self.metadata_cache:
             file_path = self.get_cache_path(paper_id)
             return file_path.exists()
@@ -117,21 +116,21 @@ class CacheManager:
         file_size: int = 0,
     ) -> CacheMetadata:
         """
-        注册一个新的 PDF 文件到缓存
+        Registers a new PDF file to the cache
         
         Args:
-            paper_id: 论文 ID
-            url: 论文 URL
-            file_path: 本地文件路径
-            file_size: 文件大小
+            paper_id: Paper ID
+            url: Paper URL
+            file_path: Local file path
+            file_size: File size
             
         Returns:
-            CacheMetadata: 缓存元数据
+            CacheMetadata: Cache metadata
         """
         metadata = CacheMetadata(paper_id, url, file_path)
         metadata.file_size = file_size
         
-        # 计算文件哈希
+        # Calculate file hash
         if os.path.exists(file_path):
             metadata.file_hash = self._calculate_file_hash(file_path)
         
@@ -141,7 +140,7 @@ class CacheManager:
         return metadata
     
     def get_metadata(self, paper_id: str) -> Optional[CacheMetadata]:
-        """获取论文的缓存元数据"""
+        """Gets cache metadata for a paper"""
         return self.metadata_cache.get(paper_id)
     
     def update_metadata(
@@ -151,7 +150,7 @@ class CacheManager:
         metadata: Optional[Dict] = None,
         extraction_date: Optional[str] = None,
     ):
-        """更新缓存元数据"""
+        """Updates cache metadata"""
         if paper_id in self.metadata_cache:
             meta = self.metadata_cache[paper_id]
             
@@ -165,11 +164,11 @@ class CacheManager:
             self._save_metadata()
     
     def get_all_cached_papers(self) -> List[str]:
-        """获取所有已缓存的论文 ID"""
+        """Gets IDs of all cached papers"""
         return list(self.metadata_cache.keys())
     
     def get_cache_stats(self) -> Dict:
-        """获取缓存统计信息"""
+        """Gets cache statistics"""
         total_size = 0
         cached_count = 0
         extracted_count = 0
@@ -192,18 +191,18 @@ class CacheManager:
     
     def cleanup(self, max_age_days: int = 30, max_size_mb: int = 5000):
         """
-        清理缓存
+        Cleans up the cache
         
         Args:
-            max_age_days: 最大天数（超过此时间的论文将被删除）
-            max_size_mb: 最大缓存大小（MB）
+            max_age_days: Max age in days (papers older than this will be deleted)
+            max_size_mb: Max cache size in MB
         """
         from datetime import timedelta
         
         now = datetime.now()
         papers_to_delete = []
         
-        # 检查日期
+        # Check by date
         for paper_id, meta in self.metadata_cache.items():
             downloaded_date = datetime.fromisoformat(meta.downloaded_date)
             age = now - downloaded_date
@@ -211,27 +210,27 @@ class CacheManager:
             if age > timedelta(days=max_age_days):
                 papers_to_delete.append(paper_id)
         
-        # 检查总大小
+        # Check total size
         stats = self.get_cache_stats()
         if stats["total_size_mb"] > max_size_mb and papers_to_delete:
-            # 删除最旧的论文
+            # Delete oldest papers
             papers_to_delete.sort(
                 key=lambda p: self.metadata_cache[p].downloaded_date
             )
         
-        # 执行删除
+        # Execute deletion
         for paper_id in papers_to_delete:
             self.delete_cached_pdf(paper_id)
     
     def delete_cached_pdf(self, paper_id: str):
-        """删除缓存的 PDF"""
+        """Deletes a cached PDF"""
         file_path = self.get_cache_path(paper_id)
         
         if file_path.exists():
             try:
                 file_path.unlink()
             except Exception as e:
-                print(f"删除文件失败: {e}")
+                print(f"Failed to delete file: {e}")
         
         if paper_id in self.metadata_cache:
             del self.metadata_cache[paper_id]
@@ -239,7 +238,7 @@ class CacheManager:
     
     @staticmethod
     def _calculate_file_hash(file_path: str, algorithm: str = "sha256") -> str:
-        """计算文件哈希值"""
+        """Calculates file hash value"""
         hash_obj = hashlib.new(algorithm)
         
         with open(file_path, 'rb') as f:

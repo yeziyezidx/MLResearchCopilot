@@ -16,6 +16,7 @@ from src.core.broad_answer_generation import BroadAnswerGenerator
 from src.core.concept_understanding import ConceptUnderstanding
 from src.core.problem_formulation import ProblemFormulator
 from src.retrieval.retriever import Retriever
+from src.pdf_management.pdf_processor import PDFProcessor
 from src.extraction.paper_extractor import PaperExtractor
 from src.synthesis.aggregator import Aggregator
 from src.synthesis.summarizer import Summarizer
@@ -47,6 +48,7 @@ class ResearchEngine:
         self.concept_understander = ConceptUnderstanding(self.llm_client)
         self.problem_formulator = ProblemFormulator(self.llm_client)
         self.retriever = Retriever(use_semantic_search=False)
+        self.pdf_processor = PDFProcessor(cache_dir="./cache/pdfs", llm_client = self.llm_client)
         self.paper_extractor = PaperExtractor(self.llm_client)
         self.aggregator = Aggregator()
         self.summarizer = Summarizer(self.llm_client)
@@ -123,17 +125,16 @@ class ResearchEngine:
                 self.debug_logger.log_step("retrieve_academic_papers", {query: papers} , step_number=5)
                 self.debug_logger.log_step("retrieve_academic_papers_subquery", sub_query_results , step_number=5)
             
-            # 6. information extraction
-            print("\n-- step 6: information extraction...")
-            structured_papers = []
-            for paper in papers:
-                structured = self.paper_extractor.extract(paper)
-                structured_papers.append(structured)
-            print(f" -> processed {len(structured_papers)} papers")
+            # 6. pdf downloading and parsing papers
+            print("\n-- step 6: download and parsing papers...")
+            structured_papers = self.pdf_processor.process_papers_batch(papers=papers, urlkey="pdf_url", force_reprocess=False)
+            print(f" -> processed {len(structured_papers["papers"].keys())} papers")
+            if self.debug_logger:
+                self.debug_logger.log_step("parsed_full_papers", structured_papers , step_number=6)
             
             # 7. cross-paper synthesis
             print("\n-- step 7: cross-paper synthesis...")
-            synthesis = self.summarizer.synthesize(structured_papers)
+            synthesis = self.summarizer.synthesize(structured_papers["papers"])
             aggregation = self.aggregator.generate_summary(structured_papers)
             print(f" -> identified {aggregation['total_papers']} papers")
             print(f" -> top methods: {list(aggregation['top_methods'].keys())[:3]}")

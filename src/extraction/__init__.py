@@ -1,5 +1,5 @@
 """
-信息抽取模块
+Information Extraction Module
 """
 
 from .paper_extractor import PaperExtractor
