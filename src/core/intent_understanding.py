@@ -155,6 +155,14 @@ class IntentUnderstanding:
             
             intent_data = json.loads(json_str)
 
+            research_questions = []
+            for key, value in intent_data["research_questions"].items():
+                if len(value) > 3:
+                    research_questions += value[:3]
+                else:
+                    research_questions += value
+            intent_data["research_questions"] = research_questions
+            
             for key, value in intent_data.items():
                 if isinstance(value, dict):
                     result = []

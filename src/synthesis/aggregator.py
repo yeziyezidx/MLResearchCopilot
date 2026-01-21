@@ -1,27 +1,27 @@
 """
-跨论文聚合模块
+Cross-paper aggregation module
 """
 from typing import List, Dict, Optional
 from collections import defaultdict
-from src.extraction.structured_output import StructuredPaper
+from src.pdf_management.parser import ExtractedInfo
 
 
 class Aggregator:
-    """跨论文聚合器"""
+    """Cross-paper aggregator"""
     
     def __init__(self):
-        """初始化聚合器"""
+        """Initializes the aggregator"""
         pass
     
-    def aggregate_methods(self, papers: List[StructuredPaper]) -> Dict[str, int]:
+    def aggregate_methods(self, papers: List[ExtractedInfo]) -> Dict[str, int]:
         """
-        聚合所有论文中使用的方法
+        Aggregates methods used across all papers
         
         Args:
-            papers: 论文列表
+            papers: List of papers
             
         Returns:
-            Dict: 方法频度统计
+            Dict: Method frequency statistics
         """
         method_count = defaultdict(int)
         
@@ -31,15 +31,15 @@ class Aggregator:
         
         return dict(sorted(method_count.items(), key=lambda x: x[1], reverse=True))
     
-    def aggregate_datasets(self, papers: List[StructuredPaper]) -> Dict[str, int]:
+    def aggregate_datasets(self, papers: List[ExtractedInfo]) -> Dict[str, int]:
         """
-        聚合所有论文中使用的数据集
+        Aggregates datasets used across all papers
         
         Args:
-            papers: 论文列表
+            papers: List of papers
             
         Returns:
-            Dict: 数据集频度统计
+            Dict: Dataset frequency statistics
         """
         dataset_count = defaultdict(int)
         
@@ -49,15 +49,15 @@ class Aggregator:
         
         return dict(sorted(dataset_count.items(), key=lambda x: x[1], reverse=True))
     
-    def aggregate_metrics(self, papers: List[StructuredPaper]) -> Dict[str, List[float]]:
+    def aggregate_metrics(self, papers: List[ExtractedInfo]) -> Dict[str, List[float]]:
         """
-        聚合所有论文中的评估指标
+        Aggregates evaluation metrics across all papers
         
         Args:
-            papers: 论文列表
+            papers: List of papers
             
         Returns:
-            Dict: 指标值列表
+            Dict: List of metric values
         """
         metrics = defaultdict(list)
         
@@ -67,15 +67,15 @@ class Aggregator:
         
         return dict(metrics)
     
-    def aggregate_keywords(self, papers: List[StructuredPaper]) -> Dict[str, int]:
+    def aggregate_keywords(self, papers: List[ExtractedInfo]) -> Dict[str, int]:
         """
-        聚合所有论文中的关键词
+        Aggregates keywords across all papers
         
         Args:
-            papers: 论文列表
+            papers: List of papers
             
         Returns:
-            Dict: 关键词频度统计
+            Dict: Keyword frequency statistics
         """
         keyword_count = defaultdict(int)
         
@@ -85,15 +85,15 @@ class Aggregator:
         
         return dict(sorted(keyword_count.items(), key=lambda x: x[1], reverse=True))
     
-    def aggregate_contributions(self, papers: List[StructuredPaper]) -> List[Dict]:
+    def aggregate_contributions(self, papers: List[ExtractedInfo]) -> List[Dict]:
         """
-        聚合所有论文的贡献
+        Aggregates contributions from all papers
         
         Args:
-            papers: 论文列表
+            papers: List of papers
             
         Returns:
-            List: 贡献列表（带来源信息）
+            List: List of contributions (with source information)
         """
         contributions = []
         
@@ -108,15 +108,15 @@ class Aggregator:
         
         return contributions
     
-    def generate_summary(self, papers: List[StructuredPaper]) -> Dict:
+    def generate_summary(self, papers: List[ExtractedInfo]) -> Dict:
         """
-        生成论文集合的汇总统计
+        Generates summary statistics for a collection of papers
         
         Args:
-            papers: 论文列表
+            papers: List of papers
             
         Returns:
-            Dict: 汇总信息
+            Dict: Summary information
         """
         return {
             "total_papers": len(papers),

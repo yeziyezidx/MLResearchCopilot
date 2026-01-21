@@ -29,9 +29,14 @@ class ExtractedInfo:
     title: str
     authors: List[str]
     abstract: str
+    objectives: str
     methodology: str
+    datasets: str
+    models: str
+    evaluation: str
     results: str
-    conclusion: str
+    contributions: str
+    limitations: str
     figures: List[Dict]
     tables: List[Dict]
 
@@ -183,7 +188,7 @@ class PDFParser:
             f"## {s.title}\n{s.content[:100]}"
             for s in sections  # Use only the first 5 sections
         ])
-        
+   
         prompt = f"""Extract key information from the following paper content, return in JSON format:
 
 {content_text}
@@ -192,18 +197,28 @@ Please provide:
 1. title: Paper title
 2. authors: List of authors, split by ;
 3. abstract: Abstract
-4. methodology: Research methodology
-5. results: Main results
-6. key_contributions: Key contributions
+4. objective: Research objective
+5. methodology: Research methodology, including step
+6. datasets: datasets decription, if there is
+7. models: models been used, if there is
+8. evaluation: evaluation approach and metrics, if thre is
+9. results: Main results and conclusion
+10. contributions: Key contributions and innovation
+11. limitations: Limitations of the paper
 
 ### Output Requirements (must be strictly followed)
 <response>
   <title> Paper title  </title> 
   <authors>List of authors</authors>
   <abstract>Abstract </abstract>
+  <objective>Research_objective </objective>
   <methodology> Research methodology </methodology>
+  <datasets> Datasets </datasets>
+  <models> Models </models>
+  <evaluation> Evaluation </evaluation>
   <results>Main results</results>
-  <conclusion>  Key contributions </conclusion>
+  <contributions>  Key contributions </contributions>
+  <limitations> Limitations </limitations>
 </response>
 """
         
@@ -221,9 +236,14 @@ Please provide:
             title=self._find_section(sections, "title", ""),
             authors=[],
             abstract=self._find_section(sections, "abstract", ""),
+            objectives="",
             methodology=self._find_section(sections, "method", ""),
+            datasets="",
+            models="",
+            evaluation="",
             results=self._find_section(sections, "results", ""),
-            conclusion=self._find_section(sections, "conclusion", ""),
+            contributions=self._find_section(sections, "contribution", ""),
+            limitations="",
             figures=[],
             tables=[],
         )
@@ -273,6 +293,16 @@ Please provide:
         except ValueError:
             pass
         
+        objective = None
+        try:
+            start_tag = "<objective>"
+            end_tag = "</objective>"
+            start_idx = response.index(start_tag) + len(start_tag)
+            end_idx = response.index(end_tag)
+            objective = response[start_idx:end_idx].strip()
+        except ValueError:
+            pass
+
         methodology = None
         try:
             start_tag = "<methodology>"
@@ -283,6 +313,36 @@ Please provide:
         except ValueError:
             pass
         
+        datasets = None
+        try:
+            start_tag = "<datasets>"
+            end_tag = "</datasets>"
+            start_idx = response.index(start_tag) + len(start_tag)
+            end_idx = response.index(end_tag)
+            datasets = response[start_idx:end_idx].strip()
+        except ValueError:
+            pass
+
+        models = None
+        try:
+            start_tag = "<models>"
+            end_tag = "</models>"
+            start_idx = response.index(start_tag) + len(start_tag)
+            end_idx = response.index(end_tag)
+            models = response[start_idx:end_idx].strip()
+        except ValueError:
+            pass
+        
+        evaluation = None
+        try:
+            start_tag = "<evaluation>"
+            end_tag = "</evaluation>"
+            start_idx = response.index(start_tag) + len(start_tag)
+            end_idx = response.index(end_tag)
+            evaluation = response[start_idx:end_idx].strip()
+        except ValueError:
+            pass
+
         results = None
         try:
             start_tag = "<results>"
@@ -293,23 +353,38 @@ Please provide:
         except ValueError:
             pass
         
-        conclusion = None
+        contributions = None
         try:
-            start_tag = "<conclusion>"
-            end_tag = "</conclusion>"
+            start_tag = "<contributions>"
+            end_tag = "</contributions>"
             start_idx = response.index(start_tag) + len(start_tag)
             end_idx = response.index(end_tag)
-            conclusion = response[start_idx:end_idx].strip()
+            contributions = response[start_idx:end_idx].strip()
         except ValueError:
             pass
-            
+        
+        limitations = None
+        try:
+            start_tag = "<limitations>"
+            end_tag = "</limitations>"
+            start_idx = response.index(start_tag) + len(start_tag)
+            end_idx = response.index(end_tag)
+            limitations = response[start_idx:end_idx].strip()
+        except ValueError:
+            pass            
+        
         return ExtractedInfo(
             title=title,
             authors=authors,
             abstract=abstract,
+            objectives=objective,
             methodology=methodology,
+            datasets=datasets,
+            models=models,
+            evaluation=evaluation,
             results=results,
-            conclusion=conclusion,
+            contributions=contributions,
+            limitations=limitations,
             figures=None,
             tables=None,
         )

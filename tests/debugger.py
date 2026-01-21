@@ -56,7 +56,7 @@ class DebugLogger:
         filename = f"{step_number:02d}_{step_name}.json" if step_number else f"{step_name}.json"
         filepath = self.session_dir / filename
         with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(serialized_str, f, ensure_ascii=False)
+            f.write(serialized_str)
         
         print(f"✓ Logged: {filepath}")
     

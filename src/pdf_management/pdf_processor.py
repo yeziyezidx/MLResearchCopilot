@@ -133,7 +133,7 @@ class PDFProcessor:
             sections = self.parser.parse_structure(pages)
             extracted_info = self.parser.extract_key_information(pdf_path, sections)
             print(extracted_info.title )
-            print(extracted_info.conclusion)
+            print(extracted_info.contributions)
             
             # 6. extract citations
             citations = self.parser.extract_citations(pages)
