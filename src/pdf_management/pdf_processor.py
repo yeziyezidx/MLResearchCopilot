@@ -80,12 +80,18 @@ class PDFProcessor:
                 
                 # if already has metadata, return
                 if metadata and metadata.status == "extracted":
+                    extracted_info = metadata.metadata.get("extracted_info")
+                    extracted_info = ExtractedInfo(**extracted_info)
+                    extracted_info.url = url
+                    extracted_info.title = paper.get("title", extracted_info.title)
+                    print(extracted_info.title )
+                    print(extracted_info.contributions)
                     return {
                         "success": True,
                         "paper_id": paper_id,
                         "url": url,
                         "pdf_path": cached_path,
-                        "extracted_info": metadata.metadata.get("extracted_info"),
+                        "extracted_info": extracted_info,
                         "error": None,
                     }
             
@@ -132,6 +138,8 @@ class PDFProcessor:
             print(f"🔍 extract info: {paper_id}")
             sections = self.parser.parse_structure(pages)
             extracted_info = self.parser.extract_key_information(pdf_path, sections)
+            extracted_info.url = url
+            extracted_info.title = paper.get("title", extracted_info.title)
             print(extracted_info.title )
             print(extracted_info.contributions)
             

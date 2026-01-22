@@ -55,6 +55,8 @@ search_result_template = Template(r'''
 URL: $url\n  
 Summary: $snippet\n
 ''')
+
+
 @dataclass
 class BroadAnswer:
     """Broad answer structure with web search integration"""

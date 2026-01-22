@@ -39,6 +39,7 @@ class ExtractedInfo:
     limitations: str
     figures: List[Dict]
     tables: List[Dict]
+    url: str = ""
 
 
 class PDFParser:

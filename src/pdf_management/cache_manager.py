@@ -99,7 +99,7 @@ class CacheManager:
             print(f"Failed to save metadata: {e}")    
     def get_cache_path(self, paper_id: str) -> Path:
         """Gets the cached path for a paper"""
-        return self.cache_dir / f"{paper_id}.pdf"
+        return self.cache_dir / f"paper_{paper_id}.pdf"
     
     def has_cached_pdf(self, paper_id: str) -> bool:
         """Checks if the PDF is cached"""

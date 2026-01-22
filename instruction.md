@@ -10,13 +10,13 @@ Which: Approach抽取（例如：模型名称、论文名、关键库、方法�
    P3. Problem–Technique Alignment
    P4. Academic Query Generation
    ↓  
-|-->语义检索（Semantic Search）[by Domain Specific Retrieval Model: github, huggingface, 论文库（arXiv、ACL Anthology]
+|-->语义检索（Semantic Search）[by Domain Specific Retrieval Model: github, huggingface, 论文库（arXiv、ACL Anthology）]
 |   ↓  
 |候选论文 (Top-K)
 |   ↓  
 |---Related Work 理解
    ↓  
-LLM 抽取结构化信息（标题、样本量、方法、结果、干预变量…）
+LLM 抽取结构化信息（标题、摘要、方法、结果、贡献…）
    ↓  
 模型并行运行，对每篇论文生成结构化行
    ↓  
@@ -24,6 +24,4 @@ LLM 抽取结构化信息（标题、样本量、方法、结果、干预变量�
    ↓  
 跨论文聚合与证据综合（LLM 多文档 summarization）
    ↓  
-引用溯源（sentence-level citation）
-   ↓  
-用户可编辑、筛选、删除、补充
+引用溯源（sentence-level citation ）

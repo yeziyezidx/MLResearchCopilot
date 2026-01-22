@@ -5,12 +5,13 @@ from typing import List, Dict, Optional
 from rank_bm25 import BM25Okapi
 from .semantic_search import SemanticSearcher
 from .paper_sources import PaperSourceManager
-
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 class Retriever:
     """main retriever"""
     
-    def __init__(self, use_semantic_search: bool = True):
+    def __init__(self, use_semantic_search: bool = True, embedding_client = None):
         """
         initailize
         
@@ -19,7 +20,43 @@ class Retriever:
         """
         self.source_manager = PaperSourceManager()
         self.semantic_searcher = SemanticSearcher() if use_semantic_search else None
+        self.embedding_client = embedding_client
     
+    def _deduplicate_by_similarity(self, papers: List[Dict], key: str, threshold: float = 0.95):
+        # 5.1. embedding-based deduplication
+        print("\n-- step 5.1: paper deduplication...")
+        paper_texts_to_embed = [p.get(key) for p in papers]
+        embeddings = self.embedding_client.get_embeddings(paper_texts_to_embed)
+        
+        unique_papers = []
+        if embeddings and any(e for e in embeddings):
+            similarity_matrix = cosine_similarity(np.array(embeddings))
+            to_keep = np.ones(len(papers), dtype=bool)
+            for i in range(len(papers)):
+                if to_keep[i]:
+                    # if this paper is kept, mark all highly similar papers for removal
+                    for j in range(i + 1, len(papers)):
+                        if similarity_matrix[i, j] > threshold: # similarity threshold
+                            to_keep[j] = False
+            
+            unique_papers = [papers[i] for i, keep in enumerate(to_keep) if keep]
+            print(f" -> {len(papers) - len(unique_papers)} duplicate papers removed.")
+        else:
+            unique_papers = papers # skip deduplication if embeddings failed
+        
+        print(f" -> {len(unique_papers)} unique papers remaining.")
+        return unique_papers
+    
+    def _deduplicate(self, papers: List[Dict], key: str) -> List[Dict]:
+        seen = set()
+        deduped_papers = []
+        for paper in papers:
+            value = paper.get(key)
+            if value and value not in seen:
+                seen.add(value)
+                deduped_papers.append(paper)
+        return deduped_papers
+
     def search(
         self,
         original_query: str,
@@ -40,15 +77,6 @@ class Retriever:
             Dict: list of search result
         """
         
-        def _deduplicate(papers: List[Dict], key: str) -> List[Dict]:
-            seen = set()
-            deduped_papers = []
-            for paper in papers:
-                value = paper.get(key)
-                if value and value not in seen:
-                    seen.add(value)
-                    deduped_papers.append(paper)
-            return deduped_papers
 
         if sources is None:
             sources = ["arxiv", "semantic_scholar"]
@@ -65,8 +93,10 @@ class Retriever:
                 query_papers.extend(papers)
             
             # b. Deduplicate by url, then title
-            query_papers = _deduplicate(query_papers, "url")
-            query_papers = _deduplicate(query_papers, "title")
+            query_papers = self._deduplicate(query_papers, "url")
+            query_papers = self._deduplicate(query_papers, "title")
+            if self.embedding_client:
+                query_papers = self._deduplicate_by_similarity(query_papers, "title")
             
             if not query_papers:
                 continue
@@ -89,9 +119,11 @@ class Retriever:
         
         # 2. Merge and Final Ranking
         # a. Deduplicate merged list by url, then title
-        final_papers = _deduplicate(merged_top_papers, "url")
-        final_papers = _deduplicate(final_papers, "title")
-
+        final_papers = self._deduplicate(merged_top_papers, "url")
+        final_papers = self._deduplicate(final_papers, "title")
+        if self.embedding_client:
+            final_papers = self._deduplicate_by_similarity(final_papers, "title")
+        
         if not final_papers:
             return return_result
 

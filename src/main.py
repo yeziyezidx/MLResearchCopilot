@@ -11,6 +11,7 @@ sys.path.insert(0, str(project_root))
 
 from src.config import get_config
 from src.llm.client import LLMClient
+from src.slm.slm_client import SLMClient
 from src.core.intent_understanding import IntentUnderstanding
 from src.core.broad_answer_generation import BroadAnswerGenerator
 from src.core.concept_understanding import ConceptUnderstanding
@@ -28,6 +29,7 @@ class ResearchEngine:
         """Initialize the research engine"""
         self.config = config or get_config()
         self.llm_client = None
+        self.slm_client = None
         self.queries = {} 
         
         # initial LLM client
@@ -40,16 +42,23 @@ class ResearchEngine:
             papyrus_timeout_ms=self.config.PAPYRUS_TIMEOUT_MS,
             papyrus_verify_scope=self.config.PAPYRUS_VERIFY_SCOPE,
         )
+
+        # initialize SLM client for embeddings
+        self.slm_client = None #SLMClient(api_key=self.config.GOOGLE_API_KEY)
         
         # initialize modules
         self.intent_analyzer = IntentUnderstanding(self.llm_client)
         self.broad_answer_generator = BroadAnswerGenerator(self.llm_client, enable_web_search=True, num_search_results=3)
         self.concept_understander = ConceptUnderstanding(self.llm_client)
         self.problem_formulator = ProblemFormulator(self.llm_client)
-        self.retriever = Retriever(use_semantic_search=False)
+        self.retriever = Retriever(use_semantic_search=False, embedding_client=self.slm_client)
         self.pdf_processor = PDFProcessor(cache_dir="./cache/pdfs", llm_client = self.llm_client)
-        self.aggregator = Aggregator()
-        self.summarizer = Summarizer(self.llm_client)
+        self.aggregator = Aggregator(llm_client=self.llm_client)
+        self.summarizer = Summarizer(
+            llm_client=self.llm_client, 
+            slm_client=self.slm_client, 
+            aggregator=self.aggregator
+        )
 
         # debug logger
         if enable_debug:
@@ -115,10 +124,10 @@ class ResearchEngine:
 
             # 5. paper retrieval
             print("\n-- step 5: paper retrieval...")
-            papers = self.retriever.search(query, problem.academic_queris, top_k=self.config.SEARCH_TOP_K, sources=["arxiv","web"])
+            papers = self.retriever.search(query, problem.academic_queris, top_k=5, sources=["arxiv","web"])
             sub_query_results = papers.get("sub_query", {})
             papers = papers.get("original_query", [])
-            print(f" -> retrieved {len(papers)} papers")
+            print(f" -> retrieved {len(papers)} papers") 
             if self.debug_logger:
                 self.debug_logger.log_step("retrieve_academic_papers", {query: papers} , step_number=5)
                 self.debug_logger.log_step("retrieve_academic_papers_subquery", sub_query_results , step_number=5)
@@ -127,17 +136,24 @@ class ResearchEngine:
             print("\n-- step 6: download and parsing papers...")
             
             parsed_papers = self.pdf_processor.process_papers_batch(papers=papers , urlkey="pdf_url", force_reprocess=False)
-            structured_papers = [paper["extracted_info"] for paper in parsed_papers["download_results"].values() if paper["success"] and paper["extracted_info"]]
+            structured_papers = [paper["extracted_info"] for paper in parsed_papers["papers"].values() if paper["success"] and paper["extracted_info"]]
             print(f" -> processed {len(structured_papers)} papers")
             if self.debug_logger:
                 self.debug_logger.log_step(f"parsed_papers", structured_papers , step_number=6)
             
             # 7. cross-paper synthesis
             print("\n-- step 7: cross-paper synthesis...")
-            synthesis = self.summarizer.synthesize(query, concepts, structured_papers)
-            aggregation = self.aggregator.generate_summary(structured_papers)
-            print(f" -> identified {aggregation['total_papers']} papers")
-            print(f" -> top methods: {list(aggregation['top_methods'].keys())[:3]}")
+            synthesis = self.summarizer.synthesize(
+                query=query,
+                concepts=concepts,
+                problem=problem,
+                sub_query_results=sub_query_results,
+                structured_papers=structured_papers
+            )
+            if self.debug_logger:
+                self.debug_logger.log_step(f"cross_paper_synthesis", synthesis.get("global_synthesis",{}) , step_number=7)
+                for sub_query, analysis in synthesis.get("sub_query_synthesis", {}).items():
+                    self.debug_logger.log_step(f"sub_query_synthesis_{sub_query}", analysis , step_number=7)
             
             # save results
             self.queries[query_id] = {
@@ -146,9 +162,8 @@ class ResearchEngine:
                 "intent": intent.to_dict(),
                 "concepts": concepts.to_dict(),
                 "problem": problem.to_dict(),
-                "papers": [p.to_dict() for p in structured_papers],
+                "papers": structured_papers,
                 "synthesis": synthesis,
-                "aggregation": aggregation,
                 "status": "completed",
             }
             

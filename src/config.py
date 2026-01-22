@@ -19,6 +19,7 @@ class Config:
     BASE_URL_OR_ENDPOINT = os.getenv("BASE_URL_OR_ENDPOINT", "https://westus2.papyrus.binginternal.com/chat/completions")
     # openai settings
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
     # papyrus settings
     PAPYRUS_QUOTA_ID: Optional[str] = os.getenv("PAPYRUS_QUOTA_ID", "CoreSearch/BGM")
     PAPYRUS_TIMEOUT_MS = os.getenv("PAPYRUS_TIMEOUT_MS", "100000")
